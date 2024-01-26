@@ -75,7 +75,8 @@ class ImageEditor:
                                       "resblock_updown": True,
                                       "use_fp16": True,
                                       "use_scale_shift_norm": True, })
-        self.device = torch.device(f"cuda:{self.args.gpu_id}" if torch.cuda.is_available() else "cpu")
+        #self.device = torch.device(f"cuda:{self.args.gpu_id}" if torch.cuda.is_available() else "cpu")
+        self.device = 'cuda'
         print("Using device:", self.device)
         self.model, self.diffusion = create_model_and_diffusion(**self.model_config)
 
