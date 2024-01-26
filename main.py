@@ -1,5 +1,5 @@
 import os
-from utils_vself.clip_netisualize.metrics_accumulator import MetricsAccumulator
+from utils_visualize.metrics_accumulator import MetricsAccumulator
 from numpy import random
 from optimization.augmentations import ImageAugmentations
 from PIL import Image
