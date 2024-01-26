@@ -94,21 +94,6 @@ class LossType(enum.Enum):
 
 
 class GaussianDiffusion:
-    """
-    Utilities for training and sampling diffusion models.
-
-    Ported directly from here, and then adapted over time to further experimentation.
-    https://github.com/hojonathanho/diffusion/blob/1e0dceb3b3495bbe19116a5e1b3596cd0706c543/diffusion_tf/diffusion_utils_2.py#L42
-
-    :param betas: a 1-D numpy array of betas for each diffusion timestep,
-                  starting at T and going to 1.
-    :param model_mean_type: a ModelMeanType determining what the model outputs.
-    :param model_var_type: a ModelVarType determining how variance is output.
-    :param loss_type: a LossType determining the loss function to use.
-    :param rescale_timesteps: if True, pass floating point timesteps into the
-                              model so that they are always scaled like in the
-                              original paper (0 to 1000).
-    """
 
     def __init__(
         self, *, betas, model_mean_type, model_var_type, loss_type, rescale_timesteps=False,
@@ -489,8 +474,7 @@ class GaussianDiffusion:
             init_image = th.zeros_like(img)
 
         # --------------------------------------------------------------------------------------------------------------
-        indices = list(range(self.num_timesteps - skip_timesteps))[::-1]
-        print(f'indices : {indices}')
+        indices = list(range(self.num_timesteps - skip_timesteps))[::-1] # 59, ..., 0
         batch_size = shape[0]
         init_image_batch = th.tile(init_image, dims=(batch_size, 1, 1, 1))
         # --------------------------------------------------------------------------------------------------------------
@@ -509,21 +493,22 @@ class GaussianDiffusion:
                 indices = tqdm(indices)
             image_after_step = img
             for i in indices:
+                # ------------------------------------------------------------------------------------------------------
                 if flag:
                     img = th.randn(*shape, device=device)
+                    print(f' flag, q_sampling ... ')
                     img = self.q_sample(x_start=init_image_batch,
                                         t=th.tensor([i] * shape[0], device=device), noise=img,)
                     image_after_step = img
-
+                # ------------------------------------------------------------------------------------------------------
                 if i == self.num_timesteps-skip_timesteps-1:
+                    print(f' i (59) = {i}')
                     for r in range(10):
                         t = th.tensor([i] * shape[0], device=device)
                         if randomize_class and "y" in model_kwargs:
-                            model_kwargs["y"] = th.randint(
-                                low=0,
-                                high=model.num_classes,
-                                size=model_kwargs["y"].shape,
-                                device=model_kwargs["y"].device,)
+                            model_kwargs["y"] = th.randint(low=0,high=model.num_classes,
+                                                           size=model_kwargs["y"].shape,
+                                                           device=model_kwargs["y"].device,)
                         with th.no_grad():
                             # ------------------------------------------------------------------------------------------
                             # denoising

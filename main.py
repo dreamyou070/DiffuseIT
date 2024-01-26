@@ -245,19 +245,16 @@ class ImageEditor:
         for iteration_number in range(self.args.iterations_num):
             print(f"Start iterations {iteration_number}")
             sample_size = (self.args.batch_size, 3, self.model_config["image_size"], self.model_config["image_size"],)
-            print(f' - sample_size (1,3,256,256) : {sample_size}')
-            # init sample function (output of sample function)
-            # denoising
             samples = sample_func(self.model,  # unet model
-              sample_size, # sample size
-              clip_denoised=False,
-              model_kwargs={} if self.args.model_output_size == 256 else {"y": torch.zeros([self.args.batch_size], device=self.device, dtype=torch.long)},
-              cond_fn=cond_fn, #
-              progress=True,
-              skip_timesteps=self.args.skip_timesteps,
-              init_image=self.init_image, # Lion Image
-              postprocess_fn=None,
-              randomize_class=True, )
+                                  sample_size, # sample size
+                                  clip_denoised=False,
+                                  model_kwargs={} if self.args.model_output_size == 256 else {"y": torch.zeros([self.args.batch_size], device=self.device, dtype=torch.long)},
+                                  cond_fn=cond_fn, #
+                                  progress=True,
+                                  skip_timesteps=self.args.skip_timesteps,
+                                  init_image=self.init_image, # Lion Image
+                                  postprocess_fn=None,
+                                  randomize_class=True, )
 
 
 
@@ -275,7 +272,7 @@ class ImageEditor:
                 continue
             intermediate_samples = [[] for i in range(self.args.batch_size)]
             total_steps = self.diffusion.num_timesteps - self.args.skip_timesteps - 1
-            total_steps_with_resample = self.diffusion.num_timesteps - self.args.skip_timesteps - 1 + (self.args.resample_num - 1)
+            total_steps_with_resample = self.diffusion.num_timesteps - self.args.skip_timesteps - 1 + (self.args.resample_num - 1) # 70
             for j, sample in enumerate(samples):
                 print(f' j = {j} / {total_steps_with_resample}')
                 should_save_image = j % save_image_interval == 0 or j == total_steps_with_resample
