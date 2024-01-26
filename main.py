@@ -240,25 +240,36 @@ class ImageEditor:
 
         save_image_interval = self.diffusion.num_timesteps // 5
         sample_func = (self.diffusion.ddim_sample_loop_progressive if self.args.ddim
-                       else self.diffusion.p_sample_loop_progressive)
+                     else self.diffusion.p_sample_loop_progressive)
         for iteration_number in range(self.args.iterations_num):
             print(f"Start iterations {iteration_number}")
             sample_size = (self.args.batch_size, 3, self.model_config["image_size"], self.model_config["image_size"],)
             print(f' - sample_size (1,3,256,256) : {sample_size}')
-
-
             # init sample function (output of sample function)
             # denoising
             samples = sample_func(self.model,  # unet model
-                                  sample_size, # sample size
-                                  clip_denoised=False,
-                                  model_kwargs={} if self.args.model_output_size == 256 else {"y": torch.zeros([self.args.batch_size], device=self.device, dtype=torch.long)},
-                                  cond_fn=cond_fn, #
-                                  progress=True,
-                                  skip_timesteps=self.args.skip_timesteps,
-                                  init_image=self.init_image, # Lion Image
-                                  postprocess_fn=None,
-                                  randomize_class=True, )
+              sample_size, # sample size
+              clip_denoised=False,
+              model_kwargs={} if self.args.model_output_size == 256 else {"y": torch.zeros([self.args.batch_size], device=self.device, dtype=torch.long)},
+              cond_fn=cond_fn, #
+              progress=True,
+              skip_timesteps=self.args.skip_timesteps,
+              init_image=self.init_image, # Lion Image
+              postprocess_fn=None,
+              randomize_class=True, )
+
+
+
+
+
+
+
+
+
+
+
+
+
             if self.flag_resample:
                 continue
             intermediate_samples = [[] for i in range(self.args.batch_size)]

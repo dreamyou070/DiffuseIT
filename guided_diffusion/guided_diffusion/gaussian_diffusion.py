@@ -476,12 +476,6 @@ class GaussianDiffusion:
                                   postprocess_fn=None,
                                   randomize_class=False,
                                   find_init = False):
-        """
-        Generate samples from the model and yield intermediate samples from each timestep of diffusion.
-        Arguments are the same as p_sample_loop().
-        Returns a generator over dicts, where each dict is the return value of
-        p_sample().
-        """
         if device is None:
             device = next(model.parameters()).device
         assert isinstance(shape, (tuple, list))
@@ -493,6 +487,8 @@ class GaussianDiffusion:
             img = th.randn(*shape, device=device)
         if skip_timesteps and init_image is None:
             init_image = th.zeros_like(img)
+
+        # --------------------------------------------------------------------------------------------------------------
         indices = list(range(self.num_timesteps - skip_timesteps))[::-1]
         print(f'indices : {indices}')
         batch_size = shape[0]
