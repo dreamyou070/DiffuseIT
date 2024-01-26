@@ -1,17 +1,10 @@
 import os
-from pathlib import Path
-from optimization.constants import ASSETS_DIR_NAME, RANKED_RESULTS_DIR
-
 from utils_visualize.metrics_accumulator import MetricsAccumulator
-from utils_visualize.video import save_video
-
 from numpy import random
 from optimization.augmentations import ImageAugmentations
-
 from PIL import Image
 import torch
 from torchvision import transforms
-import torchvision.transforms.functional as F
 from torchvision.transforms import functional as TF
 from torch.nn.functional import mse_loss
 from optimization.losses import range_loss, d_clip_loss
@@ -19,20 +12,17 @@ from optimization.losses import range_loss, d_clip_loss
 import numpy as np
 from src.vqc_core import *
 from model_vit.loss_vit import Loss_vit
-from CLIP import clip
 from guided_diffusion.guided_diffusion.script_util import (
     create_model_and_diffusion,
-    model_and_diffusion_defaults,
-)
-from utils_visualize.visualization import show_tensor_image, show_editied_masked_image
+    model_and_diffusion_defaults,)
 from pathlib import Path
 from id_loss import IDLoss
-
 from color_matcher import ColorMatcher
 from color_matcher.io_handler import load_img_file, save_img_file, FILE_EXTS
 from color_matcher.normalizer import Normalizer
 
 mean_sig = lambda x:sum(x)/len(x)
+
 class ImageEditor:
 
     def __init__(self, args) -> None:
