@@ -1,5 +1,5 @@
 import os
-from utils_visualize.metrics_accumulator import MetricsAccumulator
+from utils_vself.clip_netisualize.metrics_accumulator import MetricsAccumulator
 from numpy import random
 from optimization.augmentations import ImageAugmentations
 from PIL import Image
@@ -43,7 +43,7 @@ class ImageEditor:
             np.random.seed(self.args.seed)
             random.seed(self.args.seed)
 
-        # (4) loading model
+        print(" Step 1. Model")
         self.model_config = model_and_diffusion_defaults()
         if self.args.use_ffhq:
             self.model_config.update({"attention_resolutions": "16",
@@ -93,29 +93,28 @@ class ImageEditor:
                 param.requires_grad_()
         if self.model_config["use_fp16"]:
             self.model.convert_to_fp16()
+
+        print(" Step 2. VIT loss")
         with open("model_vit/config.yaml", "r") as ff:
             config = yaml.safe_load(ff)
-
         cfg = config
-
         self.VIT_LOSS = Loss_vit(cfg,
                                  lambda_ssim=self.args.lambda_ssim,
                                  lambda_dir_cls=self.args.lambda_dir_cls,
                                  lambda_contra_ssim=self.args.lambda_contra_ssim,
                                  lambda_trg=args.lambda_trg).eval()  # .requires_grad_(False)
 
+        print(" Step 3. CLIP model (for text guided image gen)")
         names = self.args.clip_models
-        # init networks
         if self.args.target_image is None:
-            self.clip_net = CLIPS(names=names, device=self.device, erasing=False)  # .requires_grad_(False)
+            self.clip_net = CLIPS(names=names,
+                                  device=self.device, erasing=False)  # .requires_grad_(False)
 
+        print(" Step 4. Image Post Processor")
         self.cm = ColorMatcher()
         self.clip_size = 224
-        self.clip_normalize = transforms.Normalize(
-            mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711]
-        )
-        #         self.lpips_model = lpips.LPIPS(net="vgg").to(self.device)
-
+        self.clip_normalize = transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073],
+                                                   std=[0.26862954, 0.26130258, 0.27577711])
         self.image_augmentations = ImageAugmentations(self.clip_size, self.args.aug_num)
         self.metrics_accumulator = MetricsAccumulator()
 
@@ -144,23 +143,32 @@ class ImageEditor:
             self.target_image_pil = self.target_image_pil.resize(self.image_size, Image.LANCZOS)  # type: ignore
             self.target_image = (TF.to_tensor(self.target_image_pil).to(self.device).unsqueeze(0).mul(2).sub(1))
 
-        # (3)
+        # (3) make clip loss
+        """ 
+        prev loss means how far target text from source text,
+        because target image is moved following target text from source text
+        """
         self.prev = self.init_image.detach()
         if self.target_image is None:
             txt2 = self.args.prompt
             txt1 = self.args.source
             with torch.no_grad():
-                #
-                self.E_I0 = E_I0 = self.clip_net.encode_image(0.5 * self.init_image + 0.5, ncuts=0)
-                self.E_S, self.E_T = E_S, E_T = self.clip_net.encode_text([txt1, txt2])
-                self.tgt = (1 * E_T - 0.4 * E_S + 0.2 * E_I0).normalize()
-
+                # ---------------------------------------------------------------------------------------------- #
+                self.E_I0 = E_I0 = self.clip_net.encode_image(0.5 * self.init_image + 0.5, ncuts=0) # E
+                self.E_S, self.E_T = E_S, E_T = self.clip_net.encode_text([txt1, txt2]) # source (Lion) -> target (Leopard)
+                self.tgt = (1 * E_T - 0.4 * E_S + 0.2 * E_I0).normalize()  #
             pred = self.clip_net.encode_image(0.5 * self.prev + 0.5, ncuts=0)
             clip_loss = - (pred @ self.tgt.T).flatten().reduce(mean_sig)
-
             self.loss_prev = clip_loss.detach().clone()
+        print(f'start clip loss : {self.loss_prev} -> type = {type(self.loss_prev)}')
+
+        # ------------------------------------------------------------------------------------------------------------ #
         self.flag_resample = False
         total_steps = self.diffusion.num_timesteps - self.args.skip_timesteps - 1
+        print(f' - self.diffusion.num_timesteps : {self.diffusion.num_timesteps}')
+        print(f' - self.args.skip_timesteps : {self.args.skip_timesteps}')
+        print(f' - total_steps : {total_steps}')
+
 
         def cond_fn(x, t, y=None):
             if self.args.prompt == "":
@@ -231,48 +239,42 @@ class ImageEditor:
             return -torch.autograd.grad(loss, x)[0], self.flag_resample
 
         save_image_interval = self.diffusion.num_timesteps // 5
+        sample_func = (self.diffusion.ddim_sample_loop_progressive if self.args.ddim
+                       else self.diffusion.p_sample_loop_progressive)
         for iteration_number in range(self.args.iterations_num):
             print(f"Start iterations {iteration_number}")
+            sample_size = (self.args.batch_size, 3, self.model_config["image_size"], self.model_config["image_size"],)
+            print(f' - sample_size (1,3,256,256) : {sample_size}')
 
-            sample_func = (self.diffusion.ddim_sample_loop_progressive if self.args.ddim
-                           else self.diffusion.p_sample_loop_progressive)
-            samples = sample_func(self.model, (self.args.batch_size, 3, self.model_config["image_size"],
-                                               self.model_config["image_size"],),
+
+            # init sample function (output of sample function)
+            # denoising
+            samples = sample_func(self.model,  # unet model
+                                  sample_size, # sample size
                                   clip_denoised=False,
-                                  model_kwargs={}
-                                  if self.args.model_output_size == 256
-                                  else {"y": torch.zeros([self.args.batch_size], device=self.device, dtype=torch.long)},
-                                  cond_fn=cond_fn,
+                                  model_kwargs={} if self.args.model_output_size == 256 else {"y": torch.zeros([self.args.batch_size], device=self.device, dtype=torch.long)},
+                                  cond_fn=cond_fn, #
                                   progress=True,
                                   skip_timesteps=self.args.skip_timesteps,
-                                  init_image=self.init_image,
+                                  init_image=self.init_image, # Lion Image
                                   postprocess_fn=None,
                                   randomize_class=True, )
             if self.flag_resample:
                 continue
-
             intermediate_samples = [[] for i in range(self.args.batch_size)]
             total_steps = self.diffusion.num_timesteps - self.args.skip_timesteps - 1
-            total_steps_with_resample = self.diffusion.num_timesteps - self.args.skip_timesteps - 1 + (
-                        self.args.resample_num - 1)
+            total_steps_with_resample = self.diffusion.num_timesteps - self.args.skip_timesteps - 1 + (self.args.resample_num - 1)
             for j, sample in enumerate(samples):
+                print(f' j = {j} / {total_steps_with_resample}')
                 should_save_image = j % save_image_interval == 0 or j == total_steps_with_resample
-
                 # self.metrics_accumulator.print_average_metric()
-
                 for b in range(self.args.batch_size):
                     pred_image = sample["pred_xstart"][b]
-                    visualization_path = Path(
-                        os.path.join(self.args.output_path, self.args.output_file)
-                    )
-                    visualization_path = visualization_path.with_name(
-                        f"{visualization_path.stem}_i_{iteration_number}_b_{b}{visualization_path.suffix}"
-                    )
-
+                    visualization_path = Path(os.path.join(self.args.output_path, self.args.output_file))
+                    visualization_path = visualization_path.with_name(f"{visualization_path.stem}_i_{iteration_number}_b_{b}{visualization_path.suffix}")
                     pred_image = pred_image.add(1).div(2).clamp(0, 1)
                     pred_image_pil = TF.to_pil_image(pred_image)
             ranked_pred_path = self.ranked_results_path / (visualization_path.name)
-
             if self.args.target_image is not None:
                 if self.args.use_colormatch:
                     src_image = Normalizer(np.asarray(pred_image_pil)).type_norm()
@@ -319,15 +321,13 @@ if __name__ == "__main__":
     parser.add_argument("--aug_num", type=int, help="The number of augmentation", default=8)
     parser.add_argument("--diff_iter", type=int, help="The number of augmentation", default=50)
     parser.add_argument("--clip_guidance_lambda", type=float,
-                        help="Controls how much the image should look like the prompt",
-                        default=2000,)
+                        help="Controls how much the image should look like the prompt", default=2000,)
     parser.add_argument("--lambda_trg", type=float,
                         help="style loss for target style image", default=2000,)
     parser.add_argument("--l2_trg_lambda", type=float,
                         help="l2 loss for target style image", default=3000,)
     parser.add_argument("--range_lambda", type=float,
-                        help="Controls how far out of range RGB values are allowed to be",
-                        default=200,)
+                        help="Controls how far out of range RGB values are allowed to be", default=200,)
     parser.add_argument("--vit_lambda", type=float, help="total vit loss", default=1,)
     parser.add_argument("--lambda_ssim", type=float, help="key self similarity loss", default=1000,)
     parser.add_argument("--lambda_dir_cls", type=float, help="semantic divergence loss", default=100,)
@@ -337,45 +337,17 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, help="The random seed", default=None)
     parser.add_argument("--gpu_id", type=int, help="The GPU ID", default=0)
     parser.add_argument("--output_path", type=str, default="output")
-    parser.add_argument(
-        "-o",
-        "--output_file",
-        type=str,
-        help="The filename to save, must be png",
-        default="output.png",
-    )
+    parser.add_argument("-o", "--output_file", type=str, help="The filename to save, must be png",
+                        default="output.png",)
     parser.add_argument("--iterations_num", type=int, help="The number of iterations", default=10)
-    parser.add_argument(
-        "--batch_size",
-        type=int,
-        help="The number number if images to sample each diffusion process",
-        default=1,
-    )
-
-    parser.add_argument(
-        "--use_ffhq",
-        action="store_true",
-    )
-    parser.add_argument(
-        "--use_prog_contrast",
-        action="store_true",
-    )
-    parser.add_argument("--use_range_restart",
-        action="store_true",
-    )
-    parser.add_argument(
-        "--use_colormatch",
-        action="store_true",
-    )
-    parser.add_argument(
-        "--use_noise_aug_all",
-        action="store_true",
-    )
-    parser.add_argument(
-        "--regularize_content",
-        action="store_true",
-    )
+    parser.add_argument("--batch_size", type=int,
+                        help="The number number if images to sample each diffusion process", default=1,)
+    parser.add_argument("--use_ffhq", action="store_true",)
+    parser.add_argument("--use_prog_contrast", action="store_true",)
+    parser.add_argument("--use_range_restart",action="store_true",)
+    parser.add_argument("--use_colormatch",action="store_true",)
+    parser.add_argument("--use_noise_aug_all",action="store_true",)
+    parser.add_argument("--regularize_content",action="store_true",)
 
     args = parser.parse_args()
     main(args)
-

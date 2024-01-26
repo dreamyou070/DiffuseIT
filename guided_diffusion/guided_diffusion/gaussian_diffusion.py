@@ -461,27 +461,23 @@ class GaussianDiffusion:
             th.sqrt(beta) * th.randn_like(img_out)
 
         return img_in_est
-    def p_sample_loop_progressive(
-        self,
-        model,
-        shape,
-        noise=None,
-        clip_denoised=True,
-        denoised_fn=None,
-        cond_fn=None,
-        model_kwargs=None,
-        device=None,
-        progress=False,
-        skip_timesteps=0,
-        init_image=None,
-        postprocess_fn=None,
-        randomize_class=False,
-        find_init = False
-    ):
+    def p_sample_loop_progressive(self,
+                                  model,
+                                  shape,
+                                  noise=None,  # noise = None
+                                  clip_denoised=True,
+                                  denoised_fn=None,
+                                  cond_fn=None,
+                                  model_kwargs=None,
+                                  device=None,
+                                  progress=False,
+                                  skip_timesteps=0,
+                                  init_image=None,
+                                  postprocess_fn=None,
+                                  randomize_class=False,
+                                  find_init = False):
         """
-        Generate samples from the model and yield intermediate samples from
-        each timestep of diffusion.
-
+        Generate samples from the model and yield intermediate samples from each timestep of diffusion.
         Arguments are the same as p_sample_loop().
         Returns a generator over dicts, where each dict is the return value of
         p_sample().
@@ -489,28 +485,26 @@ class GaussianDiffusion:
         if device is None:
             device = next(model.parameters()).device
         assert isinstance(shape, (tuple, list))
+        # --------------------------------------------------------------------------------------------------------------
+        # init noise
         if noise is not None:
             img = noise
         else:
             img = th.randn(*shape, device=device)
-
         if skip_timesteps and init_image is None:
             init_image = th.zeros_like(img)
-
         indices = list(range(self.num_timesteps - skip_timesteps))[::-1]
-
+        print(f'indices : {indices}')
         batch_size = shape[0]
         init_image_batch = th.tile(init_image, dims=(batch_size, 1, 1, 1))
-        
-        img = self.q_sample(
-                x_start=init_image_batch,
-                t=th.tensor(indices[0], dtype=th.long, device=device),
-                noise=img,
-            )
+        # --------------------------------------------------------------------------------------------------------------
+        print(f' (q_sample) make noised latent')
+        img = self.q_sample(x_start=init_image_batch,
+                            t=th.tensor(indices[0], dtype=th.long, device=device),
+                            noise=img,)
         if progress:
             # Lazy import so that we don't depend on tqdm.
             from tqdm.auto import tqdm
-
             indices = tqdm(indices)
         flag = False
         while True:
@@ -521,12 +515,10 @@ class GaussianDiffusion:
             for i in indices:
                 if flag:
                     img = th.randn(*shape, device=device)
-                    img = self.q_sample(
-                            x_start=init_image_batch,
-                            t=th.tensor([i] * shape[0], device=device),
-                            noise=img,
-                        )
+                    img = self.q_sample(x_start=init_image_batch,
+                                        t=th.tensor([i] * shape[0], device=device), noise=img,)
                     image_after_step = img
+
                 if i == self.num_timesteps-skip_timesteps-1:
                     for r in range(10):
                         t = th.tensor([i] * shape[0], device=device)
@@ -535,32 +527,26 @@ class GaussianDiffusion:
                                 low=0,
                                 high=model.num_classes,
                                 size=model_kwargs["y"].shape,
-                                device=model_kwargs["y"].device,
-                            )
+                                device=model_kwargs["y"].device,)
                         with th.no_grad():
-
-                            out = self.p_sample(
-                                model,
-                                image_after_step,
-                                t,
-                                clip_denoised=clip_denoised,
-                                denoised_fn=denoised_fn,
-                                cond_fn=cond_fn,
-                                model_kwargs=model_kwargs,
-                            )
+                            # ------------------------------------------------------------------------------------------
+                            # denoising
+                            out = self.p_sample(model,
+                                                image_after_step,
+                                                t,
+                                                clip_denoised=clip_denoised,
+                                                denoised_fn=denoised_fn,
+                                                cond_fn=cond_fn,
+                                                model_kwargs=model_kwargs,)
                             if postprocess_fn is not None:
                                 out = postprocess_fn(out, t)
-                            
                             yield out
                             flag = out["flag"] 
                             image_after_step  = out["sample"]
-                            
                         image_before_step = image_after_step.clone()
                         if r!= 9:
-                        
-                            image_after_step = self.undo(
-                            image_before_step, image_after_step,
-                            est_x_0=out['pred_xstart'], t=t-1, debug=False)
+                            image_after_step = self.undo(image_before_step, image_after_step,
+                                                         est_x_0=out['pred_xstart'], t=t-1, debug=False)
                         if flag:
                             break
                     if flag:
@@ -717,23 +703,21 @@ class GaussianDiffusion:
             final = sample
         return final["sample"]
 
-    def ddim_sample_loop_progressive(
-        self,
-        model,
-        shape,
-        noise=None,
-        clip_denoised=True,
-        denoised_fn=None,
-        cond_fn=None,
-        model_kwargs=None,
-        device=None,
-        progress=False,
-        eta=0.0,
-        skip_timesteps=0,
-        init_image=None,
-        postprocess_fn=None,
-        randomize_class=False,
-    ):
+    def ddim_sample_loop_progressive(self,
+                                     model,
+                                     shape,
+                                     noise=None,
+                                     clip_denoised=True,
+                                     denoised_fn=None,
+                                     cond_fn=None,
+                                     model_kwargs=None,
+                                     device=None,
+                                     progress=False,
+                                     eta=0.0,
+                                     skip_timesteps=0,
+                                     init_image=None,
+                                     postprocess_fn=None,
+                                     randomize_class=False, ):
         """
         Use DDIM to sample from the model and yield intermediate samples from
         each timestep of DDIM.

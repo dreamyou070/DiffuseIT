@@ -9,4 +9,7 @@ python main.py \
   --seed 42 \
   --use_noise_aug_all \
   --regularize_content \
-  --model_output_size 256
+  --model_output_size 256 \
+  --skip_timesteps 40 \
+  --diff_iter 100 \
+--iterations_num 10
