@@ -32,12 +32,10 @@ class ImageEditor:
 
         # (1) make output path
         os.makedirs(self.args.output_path, exist_ok=True)
-
-        # (2) ranked results path
         self.ranked_results_path = Path(self.args.output_path)
         os.makedirs(self.ranked_results_path, exist_ok=True)
 
-        # (3) set seed
+        # (2) set seed
         if self.args.seed is not None:
             torch.manual_seed(self.args.seed)
             np.random.seed(self.args.seed)
@@ -45,48 +43,23 @@ class ImageEditor:
 
         print(" Step 1. Model")
         self.model_config = model_and_diffusion_defaults()
-        if self.args.use_ffhq:
-            self.model_config.update({"attention_resolutions": "16",
-                                      "class_cond": self.args.model_output_size == 512,
-                                      "diffusion_steps": 1000,
-                                      "rescale_timesteps": True,
-                                      "timestep_respacing": self.args.timestep_respacing,
-                                      "image_size": self.args.model_output_size,
-                                      "learn_sigma": True,
-                                      "noise_schedule": "linear",
-                                      "num_channels": 128,
-                                      "num_head_channels": 64,
-                                      "num_res_blocks": 1,
-                                      "resblock_updown": True,
-                                      "use_fp16": False,
-                                      "use_scale_shift_norm": True, })
-        else:
-            self.model_config.update({"attention_resolutions": "32, 16, 8",
-                                      "class_cond": self.args.model_output_size == 512,
-                                      "diffusion_steps": 1000,
-                                      "rescale_timesteps": True,
-                                      "timestep_respacing": self.args.timestep_respacing,
-                                      "image_size": self.args.model_output_size,
-                                      "learn_sigma": True,
-                                      "noise_schedule": "linear",
-                                      "num_channels": 256,
-                                      "num_head_channels": 64,
-                                      "num_res_blocks": 2,
-                                      "resblock_updown": True,
-                                      "use_fp16": True,
-                                      "use_scale_shift_norm": True, })
-        #self.device = torch.device(f"cuda:{self.args.gpu_id}" if torch.cuda.is_available() else "cpu")
+        self.model_config.update({"attention_resolutions": "32, 16, 8",
+                                  "class_cond": self.args.model_output_size == 512, # class_cond = False
+                                  "diffusion_steps": 1000,
+                                  "rescale_timesteps": True,
+                                  "timestep_respacing": self.args.timestep_respacing,
+                                  "image_size": self.args.model_output_size,        # 256
+                                  "learn_sigma": True,
+                                  "noise_schedule": "linear",
+                                  "num_channels": 256,
+                                  "num_head_channels": 64,
+                                  "num_res_blocks": 2,
+                                  "resblock_updown": True,
+                                  "use_fp16": True,
+                                  "use_scale_shift_norm": True, })
         self.device = 'cuda'
-        print("Using device:", self.device)
         self.model, self.diffusion = create_model_and_diffusion(**self.model_config)
-
-        if self.args.use_ffhq:
-            self.model.load_state_dict(torch.load("./checkpoints/ffhq_10m.pt",map_location="cpu",))
-            self.idloss = IDLoss().to(self.device)
-        else:
-            self.model.load_state_dict(torch.load("../checkpoints/256x256_diffusion_uncond.pt"
-                                                  if self.args.model_output_size == 256 else "checkpoints/512x512_diffusion.pt",
-                                                  map_location="cpu",))
+        self.model.load_state_dict(torch.load("../checkpoints/256x256_diffusion_uncond.pt",map_location="cpu",))
         self.model.requires_grad_(False).eval().to(self.device)
         for name, param in self.model.named_parameters():
             if "qkv" in name or "norm" in name or "proj" in name:
@@ -94,6 +67,7 @@ class ImageEditor:
                 param.requires_grad_()
         if self.model_config["use_fp16"]:
             self.model.convert_to_fp16()
+        """
 
         print(" Step 2. VIT loss")
         with open("model_vit/config.yaml", "r") as ff:
@@ -118,6 +92,7 @@ class ImageEditor:
                                                    std=[0.26862954, 0.26130258, 0.27577711])
         self.image_augmentations = ImageAugmentations(self.clip_size, self.args.aug_num)
         self.metrics_accumulator = MetricsAccumulator()
+        """
 
     def noisy_aug(self, t, x, x_hat):
         fac = self.diffusion.sqrt_one_minus_alphas_cumprod[t]
@@ -300,7 +275,7 @@ def main(args) :
     image_editor = ImageEditor(args)
 
     print(f' step 2. edit image by prompt')
-    image_editor.edit_image_by_prompt()
+    #image_editor.edit_image_by_prompt()
     # image_editor.reconstruct_image()
 
 if __name__ == "__main__":

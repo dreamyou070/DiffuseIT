@@ -2,7 +2,9 @@
 
 python main.py \
   --prompt "Black Leopard" \
-  --source "Lion" --init_image "input_example/lion1.jpg" --output_path "../result/output_leopard" \
+  --source "Lion" \
+  --init_image "input_example/lion1.jpg" \
+  --output_path "../result/output_leopard" \
   --use_range_restart \
   --seed 42 \
   --use_noise_aug_all \
