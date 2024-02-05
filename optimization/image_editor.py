@@ -251,6 +251,7 @@ class ImageEditor:
                         else:
                             if r_loss > 0.01:
                                 self.flag_resample = True
+            print(f'loss: {loss.item()}')
             gradient = -torch.autograd.grad(loss, x, retain_graph=True)[0] # only grad
             return gradient, self.flag_resample
 
