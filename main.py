@@ -86,11 +86,17 @@ def main(args) :
         E_I0 = E_I0 = clip_net.encode_image(0.5 * init_image + 0.5, ncuts=0)
         s_text, t_text = s_text, t_text = clip_net.encode_text([txt1, txt2])
         tgt = (1 * t_text - 0.4 * s_text + 0.2 * E_I0).normalize()
-    print(f'E_IT: {E_I0}, s_text: {s_text}, t_text: {t_text}, tgt: {tgt}')
+        # E_IT: ViT-B/32: tensor(512, )
+        # s_text: ViT-B/32: tensor(1, 512)
+        # t_text: ViT-B/32: tensor(1, 512)
+        # tgt: ViT-B/32: tensor(1, 512)
+    # pred: ViT-B/32: tensor(512, )
     pred = clip_net.encode_image(0.5 * prev + 0.5, ncuts=0)
-    print(f'pred: {pred}')
+    init_sim = pred @ tgt.T
+    print(f' (3) initial similarity: {init_sim}')
+    clip_loss = - (pred @ tgt.T).flatten().reduce(mean_sig) #
     """
-    clip_loss = - (pred @ self.tgt.T).flatten().reduce(mean_sig)
+    
 
     self.loss_prev = clip_loss.detach().clone()
     self.flag_resample = False
