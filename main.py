@@ -62,10 +62,12 @@ def main(args) :
     print(" step 3. loss guide")
     with open("model_vit/config.yaml", "r") as ff:
         cfg = yaml.safe_load(ff)
-    vit_loss = Loss_vit(cfg, lambda_ssim=args.lambda_ssim, lambda_dir_cls=args.lambda_dir_cls,
-                        lambda_contra_ssim=args.lambda_contra_ssim, lambda_trg=args.lambda_trg).eval()
+    #vit_loss = Loss_vit(cfg, lambda_ssim=args.lambda_ssim, lambda_dir_cls=args.lambda_dir_cls,
+    #                    lambda_contra_ssim=args.lambda_contra_ssim, lambda_trg=args.lambda_trg).eval()
     if args.target_image is None:
-        clip_net = CLIPS(names=args.clip_models, device=device, erasing=False)  # .requires_grad_(False)
+        clip_net = CLIPS(names=args.clip_models,
+                         device=device,
+                         erasing=False)  # .requires_grad_(False)
 
     print(" Step 4. Image Post Processor")
     cm = ColorMatcher()
