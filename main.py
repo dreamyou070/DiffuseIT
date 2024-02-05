@@ -86,8 +86,9 @@ def main(args) :
         E_I0 = E_I0 = clip_net.encode_image(0.5 * init_image + 0.5, ncuts=0)
         s_text, t_text = s_text, t_text = clip_net.encode_text([txt1, txt2])
         tgt = (1 * t_text - 0.4 * s_text + 0.2 * E_I0).normalize()
-
+    print(f'E_IT: {E_I0}, s_text: {s_text}, t_text: {t_text}, tgt: {tgt}')
     pred = clip_net.encode_image(0.5 * prev + 0.5, ncuts=0)
+    print(f'pred: {pred}')
     """
     clip_loss = - (pred @ self.tgt.T).flatten().reduce(mean_sig)
 
