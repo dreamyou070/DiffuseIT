@@ -12,7 +12,7 @@ from optimization.losses import range_loss, d_clip_loss
 import numpy as np
 from src.vqc_core import *
 from model_vit.loss_vit import Loss_vit
-from utils.model_utils import get_model_config
+from utils.model_utils import get_model_config, unscale_timestep
 from pathlib import Path
 from id_loss import IDLoss
 from guided_diffusion.guided_diffusion.script_util import create_model_and_diffusion
@@ -21,225 +21,19 @@ from color_matcher.io_handler import load_img_file, save_img_file, FILE_EXTS
 from color_matcher.normalizer import Normalizer
 import argparse
 import yaml
+from optimization.image_editor import ImageEditor
+from optimization.arguments import get_arguments
 
 mean_sig = lambda x: sum(x) / len(x)
 
-"""
-class ImageEditor:    
 
-    def noisy_aug(self, t, x, x_hat):
-        fac = self.diffusion.sqrt_one_minus_alphas_cumprod[t]
-        x_mix = x_hat * fac + x * (1 - fac)
-        return x_mix
-
-    def unscale_timestep(self, t):
-        unscaled_timestep = (t * (self.diffusion.num_timesteps / 1000)).long()
-        return unscaled_timestep
-"""
 
 def main(args) :
 
-    print(f' step 1. make path and seed')
-    output_path = args.output_path
-    os.makedirs(output_path, exist_ok=True)
-    torch.manual_seed(args.seed)
-    np.random.seed(args.seed)
-    random.seed(args.seed)
+    image_editor = ImageEditor(args)
+    image_editor.edit_image_by_prompt()
+    # image_editor.reconstruct_image()
 
-    print(" step 2. Model")
-    model_config = get_model_config(args)
-    device = args.device
-    model, diffusion = create_model_and_diffusion(**model_config)
-    model.load_state_dict(torch.load("../checkpoints/256x256_diffusion_uncond.pt",map_location="cpu", ))
-    model.requires_grad_(False).eval().to(device)
-    for name, param in model.named_parameters():
-        if "qkv" in name or "norm" in name or "proj" in name:
-            #print(f'Parameter {name} requires grad!')
-            param.requires_grad_()
-    if model_config["use_fp16"]:
-       model.convert_to_fp16()
-
-    print(" step 3. loss guide")
-    with open("model_vit/config.yaml", "r") as ff:
-        cfg = yaml.safe_load(ff)
-    if args.target_image is None:
-        clip_net = CLIPS(names=args.clip_models,device=device,erasing=False)  # .requires_grad_(False)
-
-    print(" Step 4. Image Post Processor")
-    cm = ColorMatcher()
-    clip_size = 224
-    clip_normalize = transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711])
-    image_augmentations = ImageAugmentations(clip_size, args.aug_num)
-    metrics_accumulator = MetricsAccumulator()
-
-    print(" *** Editting ***")
-    print(f' (1) initial image')
-    image_size = (model_config["image_size"], model_config["image_size"])
-    init_image_pil = Image.open(args.init_image).convert("RGB").resize(image_size, Image.LANCZOS)  # type: ignore
-    init_image = (TF.to_tensor(init_image_pil).to(device).unsqueeze(0).mul(2).sub(1))
-    target_image = None
-
-    print(f' (2) prompt guide')
-    prev = init_image.detach()
-    txt1, txt2 = args.source, args.prompt
-    with torch.no_grad():
-        E_I0 = E_I0 = clip_net.encode_image(0.5 * init_image + 0.5, ncuts=0)
-        s_text, t_text = s_text, t_text = clip_net.encode_text([txt1, txt2])
-        tgt = (1 * t_text - 0.4 * s_text + 0.2 * E_I0).normalize()
-        # E_IT: ViT-B/32: tensor(512, )
-        # s_text: ViT-B/32: tensor(1, 512)
-        # t_text: ViT-B/32: tensor(1, 512)
-        # tgt: ViT-B/32: tensor(1, 512)
-    # pred: ViT-B/32: tensor(512, )
-    pred = clip_net.encode_image(0.5 * prev + 0.5, ncuts=0)
-    init_sim = pred @ tgt.T
-    clip_loss = - (pred @ tgt.T).flatten().reduce(mean_sig) #
-    loss_prev = clip_loss.detach().clone()
-    print(f' clip_loss: {clip_loss}')
-
-    print(f' (3) diffusion guiding change image')
-    flag_resample = False
-    total_steps = diffusion.num_timesteps - args.skip_timesteps - 1
-    print(f' diffusion guide total_steps: {total_steps}')
-    """
-    
-
-    
-    
-
-    def cond_fn(x, t, y=None):
-        if self.args.prompt == "":
-            return torch.zeros_like(x)
-        self.flag_resample = False
-        with torch.enable_grad():
-            frac_cont = 1.0
-            if self.target_image is None:
-                if self.args.use_prog_contrast:
-                    if self.loss_prev > -0.5:
-                        frac_cont = 0.5
-                    elif self.loss_prev > -0.4:
-                        frac_cont = 0.25
-                if self.args.regularize_content:
-                    if self.loss_prev < -0.5:
-                        frac_cont = 2
-            x = x.detach().requires_grad_()
-            t = self.unscale_timestep(t)
-
-            out = self.diffusion.p_mean_variance(
-                self.model, x, t, clip_denoised=False, model_kwargs={"y": y}
-            )
-
-            loss = torch.tensor(0)
-            if self.target_image is None:
-                if self.args.clip_guidance_lambda != 0:
-                    x_clip = self.noisy_aug(t[0].item(), x, out["pred_xstart"])
-                    pred = self.clip_net.encode_image(0.5 * x_clip + 0.5, ncuts=self.args.aug_num)
-                    clip_loss = - (pred @ self.tgt.T).flatten().reduce(mean_sig)
-                    loss = loss + clip_loss * self.args.clip_guidance_lambda
-                    self.metrics_accumulator.update_metric("clip_loss", clip_loss.item())
-                    self.loss_prev = clip_loss.detach().clone()
-            if self.args.use_noise_aug_all:
-                x_in = self.noisy_aug(t[0].item(), x, out["pred_xstart"])
-            else:
-                x_in = out["pred_xstart"]
-
-            if self.args.vit_lambda != 0:
-
-                if t[0] > self.args.diff_iter:
-                    vit_loss, vit_loss_val = self.VIT_LOSS(x_in, self.init_image, self.prev, use_dir=True,
-                                                           frac_cont=frac_cont, target=self.target_image)
-                else:
-                    vit_loss, vit_loss_val = self.VIT_LOSS(x_in, self.init_image, self.prev, use_dir=False,
-                                                           frac_cont=frac_cont, target=self.target_image)
-                loss = loss + vit_loss
-
-            if self.args.range_lambda != 0:
-                r_loss = range_loss(out["pred_xstart"]).sum() * self.args.range_lambda
-                loss = loss + r_loss
-                self.metrics_accumulator.update_metric("range_loss", r_loss.item())
-            if self.target_image is not None:
-                loss = loss + mse_loss(x_in, self.target_image) * self.args.l2_trg_lambda
-
-            if self.args.use_ffhq:
-                loss = loss + self.idloss(x_in, self.init_image) * self.args.id_lambda
-            self.prev = x_in.detach().clone()
-
-            if self.args.use_range_restart:
-                if t[0].item() < total_steps:
-                    if self.args.use_ffhq:
-                        if r_loss > 0.1:
-                            self.flag_resample = True
-                    else:
-                        if r_loss > 0.01:
-                            self.flag_resample = True
-
-        return -torch.autograd.grad(loss, x)[0], self.flag_resample
-
-    save_image_interval = self.diffusion.num_timesteps // 5
-    for iteration_number in range(self.args.iterations_num):
-        print(f"Start iterations {iteration_number}")
-
-        sample_func = (
-            self.diffusion.ddim_sample_loop_progressive
-            if self.args.ddim
-            else self.diffusion.p_sample_loop_progressive
-        )
-        samples = sample_func(
-            self.model,
-            (
-                self.args.batch_size,
-                3,
-                self.model_config["image_size"],
-                self.model_config["image_size"],
-            ),
-            clip_denoised=False,
-            model_kwargs={}
-            if self.args.model_output_size == 256
-            else {
-                "y": torch.zeros([self.args.batch_size], device=self.device, dtype=torch.long)
-            },
-            cond_fn=cond_fn,
-            progress=True,
-            skip_timesteps=self.args.skip_timesteps,
-            init_image=self.init_image,
-            postprocess_fn=None,
-            randomize_class=True,
-        )
-        if self.flag_resample:
-            continue
-
-        intermediate_samples = [[] for i in range(self.args.batch_size)]
-        total_steps = self.diffusion.num_timesteps - self.args.skip_timesteps - 1
-        total_steps_with_resample = self.diffusion.num_timesteps - self.args.skip_timesteps - 1 + (
-                    self.args.resample_num - 1)
-        for j, sample in enumerate(samples):
-            should_save_image = j % save_image_interval == 0 or j == total_steps_with_resample
-
-            # self.metrics_accumulator.print_average_metric()
-
-            for b in range(self.args.batch_size):
-                pred_image = sample["pred_xstart"][b]
-                visualization_path = Path(
-                    os.path.join(self.args.output_path, self.args.output_file)
-                )
-                visualization_path = visualization_path.with_name(
-                    f"{visualization_path.stem}_i_{iteration_number}_b_{b}{visualization_path.suffix}"
-                )
-
-                pred_image = pred_image.add(1).div(2).clamp(0, 1)
-                pred_image_pil = TF.to_pil_image(pred_image)
-        ranked_pred_path = self.ranked_results_path / (visualization_path.name)
-
-        if self.args.target_image is not None:
-            if self.args.use_colormatch:
-                src_image = Normalizer(np.asarray(pred_image_pil)).type_norm()
-                trg_image = Normalizer(np.asarray(self.target_image_pil)).type_norm()
-                img_res = self.cm.transfer(src=src_image, ref=trg_image, method='mkl')
-                img_res = Normalizer(img_res).uint8_norm()
-                save_img_file(img_res, str(ranked_pred_path))
-        else:
-            pred_image_pil.save(ranked_pred_path)
-    """
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # step 1.

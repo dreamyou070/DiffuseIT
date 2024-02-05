@@ -16,3 +16,7 @@ def get_model_config(args):
                          "use_fp16": True,
                          "use_scale_shift_norm": True, })
     return model_config
+
+def unscale_timestep(diffusion, t):
+    unscaled_timestep = (t * (diffusion.num_timesteps / 1000)).long()
+    return unscaled_timestep
