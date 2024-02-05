@@ -124,9 +124,9 @@ class ImageEditor:
 
         cfg = config
 
-        self.VIT_LOSS = Loss_vit(cfg, lambda_ssim=self.args.lambda_ssim, lambda_dir_cls=self.args.lambda_dir_cls,
-                                 lambda_contra_ssim=self.args.lambda_contra_ssim,
-                                 lambda_trg=args.lambda_trg).eval()  # .requires_grad_(False)
+        #self.VIT_LOSS = Loss_vit(cfg, lambda_ssim=self.args.lambda_ssim, lambda_dir_cls=self.args.lambda_dir_cls,
+        #                         lambda_contra_ssim=self.args.lambda_contra_ssim,
+        #                         lambda_trg=args.lambda_trg).eval()  # .requires_grad_(False)
 
         names = self.args.clip_models
         # init networks
