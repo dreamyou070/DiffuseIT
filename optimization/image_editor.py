@@ -251,11 +251,7 @@ class ImageEditor:
                         else:
                             if r_loss > 0.01:
                                 self.flag_resample = True
-            print(f'loss : {loss}')
-            print(f'x : {x}')
-            auto_grad = torch.autograd.grad(loss, x)
-            print(f'auto_grad : {auto_grad}')
-            gradient = -torch.autograd.grad(loss, x)[0]
+            gradient = -torch.autograd.grad(loss, x, retain_graph=True)[0] # only grad
             return gradient, self.flag_resample
 
         save_image_interval = self.diffusion.num_timesteps // 5
