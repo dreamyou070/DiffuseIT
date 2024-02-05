@@ -75,7 +75,7 @@ def main(args) :
     print(" *** Editting ***")
     print(f' (1) initial image')
     image_size = (model_config["image_size"], model_config["image_size"])
-    init_image_pil = Image.open(args.init_image).convert("RGB").resize(self.image_size, Image.LANCZOS)  # type: ignore
+    init_image_pil = Image.open(args.init_image).convert("RGB").resize(image_size, Image.LANCZOS)  # type: ignore
     init_image = (TF.to_tensor(init_image_pil).to(device).unsqueeze(0).mul(2).sub(1))
     target_image = None
 
