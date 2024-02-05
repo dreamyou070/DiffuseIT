@@ -93,14 +93,19 @@ def main(args) :
     # pred: ViT-B/32: tensor(512, )
     pred = clip_net.encode_image(0.5 * prev + 0.5, ncuts=0)
     init_sim = pred @ tgt.T
-    print(f' (3) initial similarity: {init_sim}')
     clip_loss = - (pred @ tgt.T).flatten().reduce(mean_sig) #
+    loss_prev = clip_loss.detach().clone()
+    print(f' clip_loss: {clip_loss}')
+
+    print(f' (3) diffusion guiding change image')
+    flag_resample = False
+    total_steps = diffusion.num_timesteps - args.skip_timesteps - 1
+    print(f' diffusion guide total_steps: {total_steps}')
     """
     
 
-    self.loss_prev = clip_loss.detach().clone()
-    self.flag_resample = False
-    total_steps = self.diffusion.num_timesteps - self.args.skip_timesteps - 1
+    
+    
 
     def cond_fn(x, t, y=None):
         if self.args.prompt == "":
