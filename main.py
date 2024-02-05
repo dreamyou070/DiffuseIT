@@ -54,7 +54,7 @@ def main(args) :
     model.requires_grad_(False).eval().to(device)
     for name, param in model.named_parameters():
         if "qkv" in name or "norm" in name or "proj" in name:
-            print(f'Parameter {name} requires grad!')
+            #print(f'Parameter {name} requires grad!')
             param.requires_grad_()
     if model_config["use_fp16"]:
        model.convert_to_fp16()
@@ -86,12 +86,19 @@ def main(args) :
     txt1, txt2 = args.source, args.prompt
     with torch.no_grad():
         s_img_emb = clip_net.encode_image(0.5 * init_image + 0.5, ncuts=0)  # E
+        print(f'init img emb : {s_img_emb.shape}')
         s_text_emb, t_text_emb = clip_net.encode_text([txt1, txt2])  # source (Lion) -> target (Leopard)
         print(f'source text emb : {s_text_emb.shape}')
         print(f'target text emb : {t_text_emb.shape}')
-        tgt = (1 * t_text_emb - 0.4 * s_text_emb + 0.2 * s_img_emb).normalize()  #
-    #pred = clip_net.encode_image(0.5 * prev + 0.5, ncuts=0)
-    #clip_loss = - (pred @ tgt.T).flatten().reduce(mean_sig)
+        """ way to move 
+            1. from source emb
+            2. to target emb
+            3. extracting source text
+        """
+        tgt = (1 * t_text_emb - 0.4 * s_text_emb + 0.2 * s_img_emb).normalize()  # way
+    pred = clip_net.encode_image(0.5 * prev + 0.5, ncuts=0)
+    clip_loss = - (pred @ tgt.T).flatten()#.reduce(mean_sig)
+    print(f'clip loss : {clip_loss}')
     #loss_prev = clip_loss.detach().clone()
 
 
