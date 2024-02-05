@@ -22,7 +22,7 @@ entire_A_every: 75
 lambda_entire_cls: 10
 lambda_entire_ssim: 1.0
 
-dino_model_name: dino_vitb8 # ['dino_vitb8', 'dino_vits8', 'dino_vitb16', 'dino_vits16']
+dino_model_name: "dino_vits8" # ['dino_vitb8', 'dino_vits8', 'dino_vitb16', 'dino_vits16']
 dino_global_patch_size: 224
 
 cls_warmup: 1
