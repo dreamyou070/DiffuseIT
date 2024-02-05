@@ -18,8 +18,9 @@ class VitExtractor:
 
     def __init__(self, model_name, device):
         #self.model = torch.hub.load('facebookresearch/dino:main', model_name).to(device)
-        self.model = torch.load('/home/dreamyou070/DiffuseIT/checkpoints/dino_deitsmall8_pretrain_full_checkpoint.pth',
-                                ).to(device) # model_name
+        state_dict = torch.load('/home/dreamyou070/DiffuseIT/checkpoints/dino_deitsmall8_pretrain_full_checkpoint.pth',)#.to(device) # model_name
+        print(f'keys : {state_dict.keys()}')
+        self.model = torch.hub.load('facebookresearch/dino:main', model_name)
         self.model.eval()
         self.model_name = model_name
         self.hook_handlers = []
