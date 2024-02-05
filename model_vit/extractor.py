@@ -20,7 +20,7 @@ class VitExtractor:
 
         #self.model = torch.hub.load('facebookresearch/dino:main', model_name,
         #                            cache_dir = '../checkpoints').to(device)
-        self.model = torch.load('../facebookresearch_dino_main', model_name).to(device)
+        self.model = torch.load('/home/dreamyou070/DiffuseIT/DiffuseIT/facebookresearch_dino_main', model_name).to(device)
         self.model.eval()
         self.model_name = model_name
         self.hook_handlers = []
