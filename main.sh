@@ -12,4 +12,5 @@ python main.py \
   --model_output_size 256 \
   --skip_timesteps 40 \
   --diff_iter 100 \
-  --iterations_num 10
+  --iterations_num 10 \
+  --clip_models "ViT-B/32"
