@@ -88,10 +88,10 @@ def main(args) :
     txt1, txt2 = args.source, args.prompt
     with torch.no_grad():
         s_img_emb = clip_net.encode_image(0.5 * init_image + 0.5, ncuts=0)  # E
-        print(f'init img emb : {s_img_emb.shape}')
+        print(f'init img emb : {s_img_emb}')
         s_text_emb, t_text_emb = clip_net.encode_text([txt1, txt2])  # source (Lion) -> target (Leopard)
-        print(f'source text emb : {s_text_emb.shape}')
-        print(f'target text emb : {t_text_emb.shape}')
+        print(f'source text emb : {s_text_emb}')
+        print(f'target text emb : {t_text_emb}')
         """ way to move 
             1. from source emb
             2. to target emb
