@@ -17,7 +17,8 @@ class VitExtractor:
     KEY_LIST = [BLOCK_KEY, ATTN_KEY, PATCH_IMD_KEY, QKV_KEY]
 
     def __init__(self, model_name, device):
-        self.model = torch.hub.load('facebookresearch/dino:main', model_name).to(device)
+        #self.model = torch.hub.load('facebookresearch/dino:main', model_name).to(device)
+        self.model = torch.load('/home/dreamyou070/DiffuseIT/checkpoints/pytorch_model.bin', model_name).to(device)
         self.model.eval()
         self.model_name = model_name
         self.hook_handlers = []

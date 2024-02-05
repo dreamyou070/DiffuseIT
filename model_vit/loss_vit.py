@@ -24,7 +24,8 @@ class Loss_vit(torch.nn.Module):
         super().__init__()
 
         self.cfg = cfg
-        self.extractor = VitExtractor(model_name=cfg['dino_model_name'], device=device)
+        self.extractor = VitExtractor(model_name=cfg['dino_model_name'],
+                                      device=device)
         
         imagenet_norm = transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
         global_resize_transform = Resize(cfg['dino_global_patch_size'], max_size=480)
