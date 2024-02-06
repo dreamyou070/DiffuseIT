@@ -474,9 +474,9 @@ class GaussianDiffusion:
         batch_size = shape[0]
         init_image_batch = th.tile(init_image, dims=(batch_size, 1, 1, 1))
         # --------------------------------------------------------------------------------------------------------------
-        print(f' (q_sample) make noised latent')
         img = self.q_sample(x_start=init_image_batch,
-                            t=th.tensor(indices[0], dtype=th.long, device=device),
+                            t=th.tensor(indices[0],
+                                        dtype=th.long, device=device),
                             noise=img,)
         if progress:
             # Lazy import so that we don't depend on tqdm.
@@ -492,22 +492,21 @@ class GaussianDiffusion:
                 # ------------------------------------------------------------------------------------------------------
                 if flag:
                     img = th.randn(*shape, device=device)
-                    print(f' flag, q_sampling ... ')
                     img = self.q_sample(x_start=init_image_batch,
                                         t=th.tensor([i] * shape[0], device=device), noise=img,)
                     image_after_step = img
                 # ------------------------------------------------------------------------------------------------------
                 if i == self.num_timesteps-skip_timesteps-1:
-                    print(f' i (59) = {i}')
                     for r in range(10):
                         t = th.tensor([i] * shape[0], device=device)
                         if randomize_class and "y" in model_kwargs:
-                            model_kwargs["y"] = th.randint(low=0,high=model.num_classes,
+                            model_kwargs["y"] = th.randint(low=0,
+                                                           high=model.num_classes,
                                                            size=model_kwargs["y"].shape,
                                                            device=model_kwargs["y"].device,)
                         with th.no_grad():
                             # ------------------------------------------------------------------------------------------
-                            # denoising
+                            print(f'-------------------- denoising step {r} ---------------------')
                             out = self.p_sample(model,
                                                 image_after_step,
                                                 t,
