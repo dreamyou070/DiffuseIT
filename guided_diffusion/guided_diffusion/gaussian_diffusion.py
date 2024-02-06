@@ -367,12 +367,11 @@ class GaussianDiffusion:
                  - 'sample': a random sample from the model.
                  - 'pred_xstart': a prediction of x_0.
         """
-        out = self.p_mean_variance(model,x,t,
-                                   clip_denoised=clip_denoised,denoised_fn=denoised_fn,
+        out = self.p_mean_variance(model, x, t, clip_denoised=clip_denoised,denoised_fn=denoised_fn,
                                    model_kwargs=model_kwargs,)
         noise = th.randn_like(x)
         nonzero_mask = ((t != 0).float().view(-1, *([1] * (len(x.shape) - 1))))  # no noise when t == 0
-        print(f'in p sample function, x : {x}')
+        print(f'in p sample function, x.requires_grad : {x.requires_grad}')
         if cond_fn is not None:
             out["mean"],flag = self.condition_mean(cond_fn, out, x, t, model_kwargs=model_kwargs)
         sample = out["mean"] + nonzero_mask * th.exp(0.5 * out["log_variance"]) * noise
@@ -506,14 +505,9 @@ class GaussianDiffusion:
                                                            device=model_kwargs["y"].device,)
                         with th.no_grad():
                             # ------------------------------------------------------------------------------------------
-                            print(f'-------------------- denoising step {r} ---------------------')
-                            out = self.p_sample(model,
-                                                image_after_step,
-                                                t,
-                                                clip_denoised=clip_denoised,
-                                                denoised_fn=denoised_fn,
-                                                cond_fn=cond_fn,
-                                                model_kwargs=model_kwargs,)
+                            print(f'------------------------------ denoising step {r} -------------------------------')
+                            out = self.p_sample(model, image_after_step, t, clip_denoised=clip_denoised,
+                                                denoised_fn=denoised_fn, cond_fn=cond_fn, model_kwargs=model_kwargs,)
                             if postprocess_fn is not None:
                                 out = postprocess_fn(out, t)
                             yield out
