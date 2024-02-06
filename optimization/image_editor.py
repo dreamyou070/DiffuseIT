@@ -201,16 +201,12 @@ class ImageEditor:
                     if self.args.regularize_content:
                         if self.loss_prev < -0.5:
                             frac_cont = 2
-                print(f'before requires_grad_() {x.requires_grad}')
                 x = x.detach().requires_grad_()
-                print(f'after requires_grad_() {x.requires_grad}')
+                """ x changeable with requires_grad_() """
                 t = self.unscale_timestep(t)
-
-                out = self.diffusion.p_mean_variance(
-                    self.model, x, t, clip_denoised=False, model_kwargs={"y": y}
-                )
-
+                out = self.diffusion.p_mean_variance(self.model, x, t, clip_denoised=False, model_kwargs={"y": y})
                 loss = torch.tensor(0)
+                # ---------------------------------- (1) CLIP LOSS ---------------------------------- #
                 if self.target_image is None:
                     if self.args.clip_guidance_lambda != 0:
                         x_clip = self.noisy_aug(t[0].item(), x, out["pred_xstart"])
@@ -224,8 +220,8 @@ class ImageEditor:
                 else:
                     x_in = out["pred_xstart"]
 
+                # ---------------------------------- (2) VIT LOSS ---------------------------------- #
                 if self.args.vit_lambda != 0:
-
                     if t[0] > self.args.diff_iter:
                         vit_loss, vit_loss_val = self.VIT_LOSS(x_in, self.init_image, self.prev, use_dir=True,
                                                                frac_cont=frac_cont, target=self.target_image)
@@ -234,17 +230,18 @@ class ImageEditor:
                                                                frac_cont=frac_cont, target=self.target_image)
                     loss = loss + vit_loss
 
+                # ---------------------------------- (3) RANGE LOSS ---------------------------------- #
                 if self.args.range_lambda != 0:
                     r_loss = range_loss(out["pred_xstart"]).sum() * self.args.range_lambda
                     loss = loss + r_loss
                     self.metrics_accumulator.update_metric("range_loss", r_loss.item())
+                """
                 if self.target_image is not None:
                     loss = loss + mse_loss(x_in, self.target_image) * self.args.l2_trg_lambda
-
                 if self.args.use_ffhq:
                     loss = loss + self.idloss(x_in, self.init_image) * self.args.id_lambda
+                """
                 self.prev = x_in.detach().clone()
-
                 if self.args.use_range_restart:
                     if t[0].item() < total_steps:
                         if self.args.use_ffhq:
@@ -253,7 +250,8 @@ class ImageEditor:
                         else:
                             if r_loss > 0.01:
                                 self.flag_resample = True
-            print(f'loss: {loss.item()}')
+
+            print(f'total loss: {loss.item()} | loss.requires_grad: {loss.requires_grad}')
             gradient = -torch.autograd.grad(loss, x, retain_graph=True)[0] # only grad
             return gradient, self.flag_resample
 
