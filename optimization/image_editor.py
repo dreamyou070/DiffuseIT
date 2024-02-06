@@ -201,7 +201,9 @@ class ImageEditor:
                     if self.args.regularize_content:
                         if self.loss_prev < -0.5:
                             frac_cont = 2
+                print(f'before requires_grad_() {x.requires_grad}')
                 x = x.detach().requires_grad_()
+                print(f'after requires_grad_() {x.requires_grad}')
                 t = self.unscale_timestep(t)
 
                 out = self.diffusion.p_mean_variance(
